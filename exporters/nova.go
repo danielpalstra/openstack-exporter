@@ -2,6 +2,7 @@ package exporters
 
 import (
 	"fmt"
+
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/aggregates"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/availabilityzones"
@@ -53,6 +54,7 @@ type NovaExporter struct {
 
 var defaultNovaMetrics = []Metric{
 	{Name: "flavors", Fn: ListFlavors},
+	{Name: "flavor_availability", Labels: []string{"id", "name", "vcpus", "memory", "disk"}},
 	{Name: "availability_zones", Fn: ListAZs},
 	{Name: "security_groups", Fn: ListComputeSecGroups},
 	{Name: "total_vms", Fn: ListAllServers},
@@ -208,6 +210,18 @@ func ListFlavors(exporter *BaseOpenStackExporter, ch chan<- prometheus.Metric) {
 
 	ch <- prometheus.MustNewConstMetric(exporter.Metrics["flavors"].Metric,
 		prometheus.GaugeValue, float64(len(allFlavors)))
+
+	for _, flavor := range allFlavors {
+		log.Infoln(flavor.Name)
+
+		var public float64
+		if flavor.IsPublic {
+			public = 1
+		}
+
+		ch <- prometheus.MustNewConstMetric(exporter.Metrics["flavor_availability"].Metric,
+			prometheus.GaugeValue, public, flavor.ID, flavor.Name, fmt.Sprintf("%v", flavor.VCPUs), fmt.Sprintf("%v", flavor.RAM), fmt.Sprintf("%v", flavor.Disk))
+	}
 }
 
 func ListAZs(exporter *BaseOpenStackExporter, ch chan<- prometheus.Metric) {
